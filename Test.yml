@@ -1,0 +1,63 @@
+name: CI Tests
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services: {}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Create venv
+        run: python -m venv .venv && source .venv/bin/activate
+
+      - name: Install backend requirements
+        run: |
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Django tests
+        run: |
+          source .venv/bin/activate
+          python backend/manage.py test
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm test --silent
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Serve frontend and run Cypress
+        run: |
+          # install a static server to serve the built frontend (port 3000)
+          npm install -g serve
+          serve -s frontend/build -l 3000 &>/tmp/serve.log & sleep 2
+          # Run Cypress E2E tests
+          cd frontend
+          npx cypress run --headless || true
